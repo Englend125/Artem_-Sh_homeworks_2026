@@ -67,7 +67,7 @@ def get_month_days(month: int, year: int) -> int:
 
 
 def is_date_format(maybe_dt: str) -> bool:
-    data = data = tuple(maybe_dt.split(DATE_SPLITER))
+    data = tuple(maybe_dt.split(DATE_SPLITER))
     first = not all(i.isdigit() for i in data)
     second = not check_date_format(data)
     return first and second
