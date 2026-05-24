@@ -9,7 +9,7 @@ INVALID_RECOVERY_TIME = "Breaker recovery time must be positive integer!"
 VALIDATIONS_FAILED = "Invalid decorator args."
 TOO_MUCH = "Too much requests, just wait."
 
-# comment
+
 P = ParamSpec("P")
 R_co = TypeVar("R_co", covariant=True)
 
