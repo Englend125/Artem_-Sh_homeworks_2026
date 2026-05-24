@@ -7,8 +7,6 @@ from part4_oop.interfaces import Cache, HasCache, Policy, Storage
 K = TypeVar("K")
 V = TypeVar("V")
 
-# comment
-
 @dataclass
 class DictStorage(Storage[K, V]):
     _data: dict[K, V] = field(default_factory=dict, init=False)
