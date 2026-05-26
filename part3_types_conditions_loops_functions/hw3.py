@@ -25,7 +25,7 @@ CATEGORY = "category"
 DATE = "date"
 
 
-EXPENSE_CATEGORIES = dict({
+EXPENSE_CATEGORIES = {
     "Food": ("Supermarket", "Restaurants", "FastFood", "Coffee", "Delivery"),
     "Transport": ("Taxi", "Public transport", "Gas", "Car service"),
     "Housing": ("Rent", "Utilities", "Repairs", "Furniture"),
@@ -35,7 +35,7 @@ EXPENSE_CATEGORIES = dict({
     "Education": ("Courses", "Books", "Tutors"),
     "Communications": ("Mobile", "Internet", "Subscriptions"),
     "Other": ("SomeCategory", "SomeOtherCategory")
-})
+}
 
 
 financial_transactions_storage: list[dict[str, Any]] = []
