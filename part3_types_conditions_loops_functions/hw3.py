@@ -4,7 +4,7 @@ from typing import Any
 
 RUN = True
 UNKNOWN_COMMAND_MSG = "Unknown command!"
-NONPOSITIVE_VALUE_MSG = "Value must be grater than zero!"
+NONPOSITIVE_VALUE_MSG = "Value must be grater than 0!"
 INCORRECT_DATE_MSG = "Invalid date!"
 NOT_EXISTS_CATEGORY = "Category not exists!"
 OP_SUCCESS_MSG = "Added"
@@ -34,7 +34,7 @@ EXPENSE_CATEGORIES = dict({
     "Clothing": ("Outerwear", "Casual", "Shoes", "Accessories"),
     "Education": ("Courses", "Books", "Tutors"),
     "Communications": ("Mobile", "Internet", "Subscriptions"),
-    "Other": ("SomeCategory", "SomeOtherCategory"),
+    "Other": ("SomeCategory", "SomeOtherCategory")
 })
 
 
@@ -62,26 +62,29 @@ def check_date_format(data: tuple[str, ...]) -> bool:
 def get_month_days(month: int, year: int) -> int:
     result = 30 + (month // 8 + month) % 2
     if month == FEB:
-        result = 28 + is_leap_year(year)
+        result = 28 + int(is_leap_year(year))
     return result
 
 
 def is_date_format(maybe_dt: str) -> bool:
     data = tuple(maybe_dt.split(DATE_SPLITER))
-    first = not all(i.isdigit() for i in data)
-    second = not check_date_format(data)
+    first = all(i.isdigit() for i in data)
+    second = check_date_format(data)
     return first and second
 
 
 def extract_date(maybe_dt: str) -> tuple[int, int, int] | None:
-    if not is_date_format():
+    if not is_date_format(maybe_dt):
         return None
 
     day, month, year = map(int, maybe_dt.split(DATE_SPLITER))
+
     if not all(i > 0 for i in (day, month, year)):
         return None
+
     if month > MONTH_IN_YEAR:
         return None
+
     if day > get_month_days(month, year):
         return None
 
@@ -94,19 +97,25 @@ def income_handler(amount: float, income_date: str) -> str:
     if date is None:
         financial_transactions_storage.append({})
         return INCORRECT_DATE_MSG
+
     if amount <= 0:
         financial_transactions_storage.append({})
         return NONPOSITIVE_VALUE_MSG
 
-    financial_transactions_storage.append({AMOUNT: amount, DATE: date})
+    financial_transactions_storage.append({
+        AMOUNT: amount,
+        DATE: date
+    })
+
     return OP_SUCCESS_MSG
 
 
 def check_category(category: str) -> bool:
-    for i in EXPENSE_CATEGORIES:
-        for j in EXPENSE_CATEGORIES[i]:
-            if category == f"{i}{CATEGORY_SPLITER}{j}":
+    for cat, subcats in EXPENSE_CATEGORIES.items():
+        for subcat in subcats:
+            if category == f"{cat}{CATEGORY_SPLITER}{subcat}":
                 return True
+
     return False
 
 
@@ -116,9 +125,11 @@ def cost_handler(category_name: str, amount: float, income_date: str) -> str:
     if date is None:
         financial_transactions_storage.append({})
         return INCORRECT_DATE_MSG
+
     if not check_category(category_name):
         financial_transactions_storage.append({})
         return NOT_EXISTS_CATEGORY
+
     if amount <= 0:
         financial_transactions_storage.append({})
         return NONPOSITIVE_VALUE_MSG
@@ -128,6 +139,7 @@ def cost_handler(category_name: str, amount: float, income_date: str) -> str:
         AMOUNT: amount,
         DATE: date,
     })
+
     return OP_SUCCESS_MSG
 
 
@@ -139,64 +151,125 @@ def cost_categories_handler() -> str:
     )
 
 
+def process_transaction(
+    cur: dict[str, Any],
+    expense: list[dict[str, Any]],
+    category_details: dict[str, float],
+) -> tuple[float, float]:
+    cur_income: float = 0
+    cur_expense: float = 0
+
+    if CATEGORY in cur:
+        expense.append({
+            CATEGORY: cur.get(CATEGORY),
+            AMOUNT: cur.get(AMOUNT),
+        })
+
+        cur_expense = cur.get(AMOUNT, 0)
+        cat = cur.get(CATEGORY, "")
+
+        category_details[cat] = (
+            category_details.get(cat, 0) + cur_expense
+        )
+    else:
+        cur_income = float(cur.get(AMOUNT, 0))
+
+    return cur_income, cur_expense
+
+
+def format_stats(
+    report_date: str,
+    total_cap: float,
+    costs_amount: float,
+    incomes_amount: float,
+    category_details: dict[str, float],
+) -> str:
+    amount_word = "loss" if total_cap < 0 else "profit"
+
+    category_details_lines = [
+        f"{i}. {cat}: {amt}"
+        for i, (cat, amt) in enumerate(category_details.items(), start=1)
+    ]
+
+    category_details_stat = "\n".join(category_details_lines)
+
+    return (
+        f"Your statistics as of {report_date}:\n"
+        f"Total capital: {total_cap} rubles\n"
+        f"This month, the {amount_word} amounted to {total_cap} rubles.\n"
+        f"Income: {incomes_amount} rubles\n"
+        f"Expenses: {costs_amount} rubles\n"
+        f"\nDetails (category: amount):\n"
+        f"{category_details_stat}\n"
+    )
+
+
 def stats_handler(report_date: str) -> str:
     date = extract_date(report_date)
+
     if date is None:
         return INCORRECT_DATE_MSG
 
-    lines = [f"Your statistics as of {date}:\n"]
+    expense: list[dict[str, Any]] = []
+    category_details: dict[str, float] = {}
 
-    total_cap = 0
-    income = 0
-    expense = []
+    income: float = 0
+    total_cap: float = 0
+
     for cur in financial_transactions_storage:
-        if cur and date <= cur[DATE]:
-            if CATEGORY in cur:
-                expense.append({
-                    CATEGORY: cur.get(CATEGORY),
-                    AMOUNT: cur.get(AMOUNT),
-                })
-                total_cap -= cur.get(AMOUNT)
-            else:
-                income += cur.get(AMOUNT)
-                total_cap += cur.get(AMOUNT)
+        cur_date = cur.get(DATE)
+        if isinstance(cur, tuple) and cur_date < date:
+            cur_income, cur_expense = process_transaction(
+                cur,
+                expense,
+                category_details
+            )
 
-    lines.append(f"Total: {total_cap:.2f}")
-    lines.append(f"Income: {income:.2f}")
-    lines.append(f"Expense: {sum(i[AMOUNT] for i in expense):.2f}")
-    lines.append("\nDetails (category: amount)\n")
+            income += cur_income
+            total_cap += cur_income - cur_expense
 
-    expense.sort(key=lambda x: x[CATEGORY])
-    for i, item in enumerate(expense):
-        lines.append(
-            "{}. {}: {}".format(i + 1, item[CATEGORY], item[AMOUNT])
-        )
-
-    return "\n".join(lines)
+    return format_stats(
+        report_date,
+        round(total_cap, 2),
+        round(sum(i.get(AMOUNT, 0) for i in expense), 2),
+        round(income, 2),
+        category_details
+    )
 
 
 def is_income_command(command: str) -> bool:
     cmd = command.split()
-    return len(cmd) == INCOME_CMD_LEN and cmd[0] == INCOME_COMMAND
+
+    return (
+        len(cmd) == INCOME_CMD_LEN
+        and cmd[0] == INCOME_COMMAND
+    )
 
 
 def is_cost_command(command: str) -> bool:
     cmd = command.split()
 
     is_list = command == COST_CATEGORIES_COMMAND
-    is_full = cmd[0] == COST_COMMAND and len(cmd) == COST_CMD_LEN
+
+    is_full = (
+        len(cmd) == COST_CMD_LEN
+        and cmd[0] == COST_COMMAND
+    )
 
     return is_list or is_full
 
 
 def is_stats_command(command: str) -> bool:
     cmd = command.split()
-    return cmd[0] == STATS_COMMAND and len(cmd) == STATS_CMD_LEN
+
+    return (
+        len(cmd) == STATS_CMD_LEN
+        and cmd[0] == STATS_COMMAND
+    )
 
 
 def is_category_command(command: str) -> bool:
-    cmd = command.split()
-    return cmd[0] == STATS_COMMAND and len(cmd) == CATEGORY_CMD_LEN
+    return command == COST_CATEGORIES_COMMAND
 
 
 def command_handler(command: str) -> None:
@@ -214,13 +287,15 @@ def command_handler(command: str) -> None:
         res = cost_handler(
             cmd[1],
             float(cmd[2]),
-            cmd[3],
+            cmd[3]
         )
+
         print(
             res
             if res == OP_SUCCESS_MSG
-            else "\n".join([res, cost_categories_handler()]),
+            else f"{res}\n{cost_categories_handler()}"
         )
+
         return
 
     if is_stats_command(command):
